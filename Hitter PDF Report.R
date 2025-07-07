@@ -8,14 +8,15 @@ library(GeomMLBStadiums)
 library(ggrepel)
 
 # Working Directory and CSV Data
-setwd("~/Downloads/UConnCSV")
-data <- read.csv("UConnSeason.csv")
+setwd("~/Downloads/UConnCSV/UConn Spring 2025")
+data <- read.csv("UConn 2025.csv")
 
 # Reclassify Sinker as Fastball, Splitter as Changeup globally
 data <- data %>%
+  filter(TaggedPitchType != "Undefined") %>%
   mutate(
     TaggedPitchType = case_when(
-      TaggedPitchType == "Sinker" ~ "Fastball",
+      TaggedPitchType %in% c("Sinker", "FourSeamFastBall") ~ "Fastball",
       TaggedPitchType == "Splitter" ~ "ChangeUp",
       TRUE ~ TaggedPitchType
     )
@@ -26,6 +27,18 @@ batters <- data %>%
   filter(BatterTeam == "UCO_HUS") %>%
   pull(Batter) %>%
   unique()
+
+consistent_colors <- c(
+  "Single" = "blue",
+  "Double" = "red",
+  "Triple" = "yellow",
+  "HomeRun" = "green",
+  "Out" = "black",
+  "Strikeout" = "purple",  # add others if needed
+  "FieldersChoice" = "orange",
+  "Error" = "cyan",
+  "Sacrifice" = "magenta"
+)
 
 # Loop over each batter
 for (batter in batters) {
@@ -58,8 +71,9 @@ for (batter in batters) {
       group_by(x_bin, y_bin) %>%
       summarise(
         PA = n(),
-        AB = sum((PitchCall %in% c("InPlay") | KorBB == "Strikeout") &
-                   !KorBB %in% c("Walk", "HitByPitch") &
+        AB = sum((PitchCall %in% c("InPlay") | KorBB == "Strikeout") & 
+                   !KorBB %in% c("Walk") & 
+                   !PitchCall %in% c("HitByPitch") & 
                    !PlayResult %in% c("Sacrifice")),
         H = sum(PlayResult %in% c("Single", "Double", "Triple", "HomeRun")),
         AVG = round(H / AB, 3),
@@ -162,7 +176,7 @@ for (batter in batters) {
   make_zone_by_side <- function(hitter, pitcher_throws) {
     result <- data %>%
       filter(Batter == hitter, PitcherThrows == pitcher_throws,
-             PitchCall %in% c("InPlay", "StrikeSwinging", "StrikeCalled"))
+             PitchCall %in% c("InPlay", "StrikeSwinging", "StrikeCalled", "FoulBallNotFieldable", "BallCalled", "HitByPitch"))
     
     x_breaks <- seq(-1.05, 1.05, length.out = 4)
     y_breaks <- seq(1.6, 3.3, length.out = 4)
@@ -226,7 +240,7 @@ for (batter in batters) {
     )
   ) +
     geom_point(size = 3, alpha = 0.7) +
-    scale_color_manual(values = c("red", "blue", "green", "orange", "purple", "yellow", "black", "cyan", "magenta", "brown")) +
+    scale_color_manual(values = consistent_colors) +
     labs(
       title = "BIP Chart",
       x = "Horizontal Pitch Location",
@@ -278,8 +292,8 @@ for (batter in batters) {
     group_by(TaggedPitchType) %>%
     summarise(
       Pitches = n(),
-      PA = sum(PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout", "Walk", "HitbyPitch")),
-      AB = sum((PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout")) & !KorBB %in% c("Walk", "HitbyPitch") & !PlayResult %in% c("Sacrifice")),
+      PA = sum(PitchCall %in% c("InPlay", "HitByPitch") | KorBB %in% c("Strikeout", "Walk")),
+      AB = sum((PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout")) & !PitchCall %in% c("HitByPitch") & !KorBB %in% c("Walk") & !PlayResult %in% c("Sacrifice")),
       H = sum(PlayResult %in% c("Single", "Double", "Triple", "HomeRun")),
       `1B` = sum(PlayResult == "Single"),
       `2B` = sum(PlayResult == "Double"),
@@ -292,20 +306,21 @@ for (batter in batters) {
       OBP = round((sum(H, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE)) / sum(PA, na.rm = TRUE), 3),
       SLG = round((sum(`1B`, na.rm = TRUE) + 2*sum(`2B`, na.rm = TRUE) + 3*sum(`3B`, na.rm = TRUE) + 4*sum(HR, na.rm = TRUE)) / sum(AB, na.rm = TRUE), 3),
       OPS = (OBP + SLG),
-      "Swing%" = round(sum(Swing) / Pitches * 100, 1),
-      "Whiff%" = round(sum(PitchCall == "StrikeSwinging") / sum(Swing) * 100, 1),
-      "Chase%" = round(sum(Chase) / sum(Swing) * 100, 1),
-      "Strikeout%" = round(sum(SO) / sum(AB) * 100, 1),
-      "Walk%" = round(sum(BB) / sum(AB) * 100, 1),
-      "GroundBall%" = round(sum(TaggedHitType == "GroundBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
-      "FlyBall%" = round(sum(TaggedHitType == "FlyBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
-      "LineDrive%" = round(sum(TaggedHitType == "LineDrive") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
+      `Swing%` = round(sum(Swing) / Pitches * 100, 1),
+      `ZSwing%` = round(ifelse(sum(InStrikeZone, na.rm = TRUE) > 0, sum(ZSwing, na.rm = TRUE) / sum(InStrikeZone, na.rm = TRUE) * 100, 0), 1),
+      `Chase%` = round(ifelse(sum(Swing, na.rm = TRUE) > 0, sum(Chase, na.rm = TRUE) / sum(Swing, na.rm = TRUE) * 100, 0), 1),
+      `Whiff%` = round(sum(PitchCall == "StrikeSwinging") / sum(Swing) * 100, 1),
+      `Strikeout%` = round(sum(SO) / sum(AB) * 100, 1),
+      `Walk%` = round(sum(BB) / sum(AB) * 100, 1),
+      `GroundBall%` = round(sum(TaggedHitType == "GroundBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
+      `FlyBall%` = round(sum(TaggedHitType == "FlyBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
+      `LineDrive%` = round(sum(TaggedHitType == "LineDrive") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
       AvgExitVelocity = round(mean(ExitSpeed, na.rm = TRUE), 1),
       MaxExitVelocity = round(max(ExitSpeed, na.rm = TRUE), 1),
-      "HardHit%" = round(sum(HardHitCheck, na.rm = TRUE) / sum(PitchCall == "InPlay", na.rm = TRUE) * 100, 1)
+      `HardHit%` = round(sum(HardHitCheck, na.rm = TRUE) / sum(PitchCall == "InPlay", na.rm = TRUE) * 100, 1)
     ) %>%
     mutate(`Pitch%` = round(Pitches / total_pitches * 100, 1)) %>%
-    select(TaggedPitchType, Pitches, `Pitch%`, `Swing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `AvgExitVelocity`, `MaxExitVelocity`, `HardHit%`, `AVG`) %>%
+    select(TaggedPitchType, Pitches, `Pitch%`, `Swing%`, `ZSwing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `AvgExitVelocity`, `MaxExitVelocity`, `HardHit%`, `AVG`) %>%
     arrange(desc(Pitches))
   
   # Row for "All"
@@ -313,8 +328,8 @@ for (batter in batters) {
     summarise(
       TaggedPitchType = "All",
       Pitches = n(),
-      PA = sum(PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout", "Walk", "HitbyPitch")),
-      AB = sum((PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout")) & !KorBB %in% c("Walk", "HitbyPitch") & !PlayResult %in% c("Sacrifice")),
+      PA = sum(PitchCall %in% c("InPlay", "HitByPitch") | KorBB %in% c("Strikeout", "Walk")),
+      AB = sum((PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout")) & !PitchCall %in% c("HitByPitch") & !KorBB %in% c("Walk") & !PlayResult %in% c("Sacrifice")),
       H = sum(PlayResult %in% c("Single", "Double", "Triple", "HomeRun")),
       `1B` = sum(PlayResult == "Single"),
       `2B` = sum(PlayResult == "Double"),
@@ -327,20 +342,21 @@ for (batter in batters) {
       OBP = round((sum(H, na.rm = TRUE) + sum(BB, na.rm = TRUE) + sum(HBP, na.rm = TRUE)) / sum(PA, na.rm = TRUE), 3),
       SLG = round((sum(`1B`, na.rm = TRUE) + 2*sum(`2B`, na.rm = TRUE) + 3*sum(`3B`, na.rm = TRUE) + 4*sum(HR, na.rm = TRUE)) / sum(AB, na.rm = TRUE), 3),
       OPS = (OBP + SLG),
-      "Swing%" = round(sum(Swing) / Pitches * 100, 1),
-      "Whiff%" = round(sum(PitchCall == "StrikeSwinging") / sum(Swing) * 100, 1),
-      "Chase%" = round(sum(Chase) / sum(Swing) * 100, 1),
-      "Strikeout%" = round(sum(SO) / sum(AB) * 100, 1),
-      "Walk%" = round(sum(BB) / sum(AB) * 100, 1),
-      "GroundBall%" = round(sum(TaggedHitType == "GroundBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
-      "FlyBall%" = round(sum(TaggedHitType == "FlyBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
-      "LineDrive%" = round(sum(TaggedHitType == "LineDrive") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
+      `Swing%` = round(sum(Swing) / Pitches * 100, 1),
+      `ZSwing%` = round(ifelse(sum(InStrikeZone, na.rm = TRUE) > 0, sum(ZSwing, na.rm = TRUE) / sum(InStrikeZone, na.rm = TRUE) * 100, 0), 1),
+      `Chase%` = round(ifelse(sum(Swing, na.rm = TRUE) > 0, sum(Chase, na.rm = TRUE) / sum(Swing, na.rm = TRUE) * 100, 0), 1),
+      `Whiff%` = round(sum(PitchCall == "StrikeSwinging") / sum(Swing) * 100, 1),
+      `Strikeout%` = round(sum(SO) / sum(AB) * 100, 1),
+      `Walk%` = round(sum(BB) / sum(AB) * 100, 1),
+      `GroundBall%` = round(sum(TaggedHitType == "GroundBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
+      `FlyBall%` = round(sum(TaggedHitType == "FlyBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
+      `LineDrive%` = round(sum(TaggedHitType == "LineDrive") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
       AvgExitVelocity = round(mean(ExitSpeed, na.rm = TRUE), 1),
       MaxExitVelocity = round(max(ExitSpeed, na.rm = TRUE), 1),
-      "HardHit%" = round(sum(HardHitCheck, na.rm = TRUE) / sum(PitchCall == "InPlay", na.rm = TRUE) * 100, 1)
+      `HardHit%` = round(sum(HardHitCheck, na.rm = TRUE) / sum(PitchCall == "InPlay", na.rm = TRUE) * 100, 1)
     ) %>%
     mutate(`Pitch%` = round(Pitches / total_pitches * 100, 1)) %>%
-    select(TaggedPitchType, Pitches, `Pitch%`, `Swing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `AvgExitVelocity`, `MaxExitVelocity`, `HardHit%`, `AVG`) %>%
+    select(TaggedPitchType, Pitches, `Pitch%`, `Swing%`, `ZSwing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `AvgExitVelocity`, `MaxExitVelocity`, `HardHit%`, `AVG`) %>%
     arrange(desc(Pitches))
   
   # Combine pitch-specific statistics with the "All" row
@@ -394,8 +410,8 @@ for (batter in batters) {
     
     statistics <- data_filtered %>%
       summarise(
-        PA = sum(PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout", "Walk", "HitbyPitch")),
-        AB = sum((PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout")) & !PlayResult %in% c("Sacrifice")),
+        PA = sum(PitchCall %in% c("InPlay", "HitByPitch") | KorBB %in% c("Strikeout", "Walk")),
+        AB = sum((PitchCall %in% c("InPlay") | KorBB %in% c("Strikeout")) & !PitchCall %in% c("HitByPitch") & !KorBB %in% c("Walk") & !PlayResult %in% c("Sacrifice")),
         H = sum(PlayResult %in% c("Single", "Double", "Triple", "HomeRun")),
         `1B` = sum(PlayResult == "Single"),
         `2B` = sum(PlayResult == "Double"),
@@ -534,10 +550,11 @@ for (batter in batters) {
   # Save the report
   filename_safe <- gsub(", ", "_", hitter_name)
   pdf_filename <- paste0(formatted_name, " Hitting Report.pdf")
-  pdf(pdf_filename, width = 10, height = 18)
+  pdf(pdf_filename, width = 10, height = 19)
   grid.draw(report_layout)
   dev.off()
   
   cat("PDF saved as '", pdf_filename, "'\n", sep = "")
   
 }
+
