@@ -307,7 +307,7 @@ for (batter in batters) {
       SLG = round((sum(`1B`, na.rm = TRUE) + 2*sum(`2B`, na.rm = TRUE) + 3*sum(`3B`, na.rm = TRUE) + 4*sum(HR, na.rm = TRUE)) / sum(AB, na.rm = TRUE), 3),
       OPS = (OBP + SLG),
       `Swing%` = round(sum(Swing) / Pitches * 100, 1),
-      `ZSwing%` = round(ifelse(sum(InStrikeZone, na.rm = TRUE) > 0, sum(ZSwing, na.rm = TRUE) / sum(InStrikeZone, na.rm = TRUE) * 100, 0), 1),
+      `Zone Swing%` = round(ifelse(sum(InStrikeZone, na.rm = TRUE) > 0, sum(ZSwing, na.rm = TRUE) / sum(InStrikeZone, na.rm = TRUE) * 100, 0), 1),
       `Chase%` = round(ifelse(sum(Swing, na.rm = TRUE) > 0, sum(Chase, na.rm = TRUE) / sum(Swing, na.rm = TRUE) * 100, 0), 1),
       `Whiff%` = round(sum(PitchCall == "StrikeSwinging") / sum(Swing) * 100, 1),
       `Strikeout%` = round(sum(SO) / sum(AB) * 100, 1),
@@ -315,12 +315,13 @@ for (batter in batters) {
       `GroundBall%` = round(sum(TaggedHitType == "GroundBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
       `FlyBall%` = round(sum(TaggedHitType == "FlyBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
       `LineDrive%` = round(sum(TaggedHitType == "LineDrive") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
-      AvgExitVelocity = round(mean(ExitSpeed, na.rm = TRUE), 1),
-      MaxExitVelocity = round(max(ExitSpeed, na.rm = TRUE), 1),
+      `Avg EV` = round(mean(ExitSpeed, na.rm = TRUE), 1),
+      `Max EV` = round(max(ExitSpeed, na.rm = TRUE), 1),
       `HardHit%` = round(sum(HardHitCheck, na.rm = TRUE) / sum(PitchCall == "InPlay", na.rm = TRUE) * 100, 1)
     ) %>%
+    filter(Pitches > 1) %>%
     mutate(`Pitch%` = round(Pitches / total_pitches * 100, 1)) %>%
-    select(TaggedPitchType, Pitches, `Pitch%`, `Swing%`, `ZSwing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `AvgExitVelocity`, `MaxExitVelocity`, `HardHit%`, `AVG`) %>%
+    select(TaggedPitchType, Pitches, `Pitch%`, `Swing%`, `Zone Swing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `Avg EV`, `Max EV`, `HardHit%`, `AVG`) %>%
     arrange(desc(Pitches))
   
   # Row for "All"
@@ -343,7 +344,7 @@ for (batter in batters) {
       SLG = round((sum(`1B`, na.rm = TRUE) + 2*sum(`2B`, na.rm = TRUE) + 3*sum(`3B`, na.rm = TRUE) + 4*sum(HR, na.rm = TRUE)) / sum(AB, na.rm = TRUE), 3),
       OPS = (OBP + SLG),
       `Swing%` = round(sum(Swing) / Pitches * 100, 1),
-      `ZSwing%` = round(ifelse(sum(InStrikeZone, na.rm = TRUE) > 0, sum(ZSwing, na.rm = TRUE) / sum(InStrikeZone, na.rm = TRUE) * 100, 0), 1),
+      `Zone Swing%` = round(ifelse(sum(InStrikeZone, na.rm = TRUE) > 0, sum(ZSwing, na.rm = TRUE) / sum(InStrikeZone, na.rm = TRUE) * 100, 0), 1),
       `Chase%` = round(ifelse(sum(Swing, na.rm = TRUE) > 0, sum(Chase, na.rm = TRUE) / sum(Swing, na.rm = TRUE) * 100, 0), 1),
       `Whiff%` = round(sum(PitchCall == "StrikeSwinging") / sum(Swing) * 100, 1),
       `Strikeout%` = round(sum(SO) / sum(AB) * 100, 1),
@@ -351,16 +352,18 @@ for (batter in batters) {
       `GroundBall%` = round(sum(TaggedHitType == "GroundBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
       `FlyBall%` = round(sum(TaggedHitType == "FlyBall") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
       `LineDrive%` = round(sum(TaggedHitType == "LineDrive") / sum(TaggedHitType %in% c("GroundBall", "FlyBall", "Popup", "LineDrive")) * 100, 1),
-      AvgExitVelocity = round(mean(ExitSpeed, na.rm = TRUE), 1),
-      MaxExitVelocity = round(max(ExitSpeed, na.rm = TRUE), 1),
+      `Avg EV` = round(mean(ExitSpeed, na.rm = TRUE), 1),
+      `Max EV` = round(max(ExitSpeed, na.rm = TRUE), 1),
       `HardHit%` = round(sum(HardHitCheck, na.rm = TRUE) / sum(PitchCall == "InPlay", na.rm = TRUE) * 100, 1)
     ) %>%
     mutate(`Pitch%` = round(Pitches / total_pitches * 100, 1)) %>%
-    select(TaggedPitchType, Pitches, `Pitch%`, `Swing%`, `ZSwing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `AvgExitVelocity`, `MaxExitVelocity`, `HardHit%`, `AVG`) %>%
+    select(Pitches, `Swing%`, `Zone Swing%`, `Whiff%`, `Chase%`, `GroundBall%`, `FlyBall%`, `LineDrive%`, `Avg EV`, `Max EV`, `HardHit%`) %>%
     arrange(desc(Pitches))
   
+  
   # Combine pitch-specific statistics with the "All" row
-  combined_statistics <- bind_rows(statistics, all_statistics)
+  combined_statistics <- (statistics) %>%
+    rename(`Pitch Type` = TaggedPitchType)
   
   performance_title <- textGrob(
     "Stats By Pitch Type",
@@ -505,17 +508,22 @@ for (batter in batters) {
   # Update tables with theme
   performance_grob <- tableGrob(combined_statistics, rows = NULL, theme = fancy_table_theme)
   statistics_grob <- tableGrob(statistics_table, rows = NULL, theme = fancy_table_theme)
+  all_statistics_table <- tableGrob(all_statistics, rows = NULL, theme = fancy_table_theme)
   
   # Combine the title and the performance table into a single grob
-  performance_grob_with_title <- grid.arrange(performance_title, performance_grob, ncol = 1, heights = c(0.025, 0.975))
+  performance_grob_with_title <- grid.arrange(performance_title, performance_grob, ncol = 1, heights = c(0.05, 0.95))
   statistics_grob_with_title <- grid.arrange(statistics_title, statistics_grob, ncol = 1, heights = c(0.025, 0.975))
   
-  # Combine Tables
   combined_tables_grob <- arrangeGrob(
-    grobs = list(statistics_grob_with_title, performance_grob_with_title),
-    nrow = 2,
-    heights = c(0.05, 0.22)
+    grobs = list(
+      statistics_grob_with_title,
+      all_statistics_table,
+      performance_grob_with_title
+    ),
+    nrow = 3,
+    heights = unit(c(2, 1, 8), "cm")  # each row gets fixed height
   )
+  
   
   # Apply theme to combined chart
   combined_hit_and_spray_chart <- arrangeGrob(
@@ -557,4 +565,3 @@ for (batter in batters) {
   cat("PDF saved as '", pdf_filename, "'\n", sep = "")
   
 }
-
